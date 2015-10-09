@@ -1,8 +1,5 @@
 #!/bin/bash
 
-[ -f mapnik_c_api.cpp ] || curl -LO https://raw.github.com/fawick/mapnik-c-api/master/mapnik_c_api.cpp
-[ -f mapnik_c_api.h ] || curl -LO https://raw.github.com/fawick/mapnik-c-api/master/mapnik_c_api.h
-
 cat > gen_import.go <<EOF
 package mapnik
 // #cgo CXXFLAGS: $(mapnik-config --cflags)
@@ -16,4 +13,6 @@ const (
 
 EOF
 
-go install -x
+if [ "$GO15VENDOREXPERIMENT" != "1" ]; then
+    go install -x
+fi

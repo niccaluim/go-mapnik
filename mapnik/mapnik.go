@@ -56,6 +56,57 @@ func (p Projection) Forward(coord Coord) Coord {
 	return Coord{float64(c.x), float64(c.y)}
 }
 
+// Layer data source
+type Datasource struct {
+	ds *C.struct__mapnik_datasource_t
+}
+
+func NewDatasource(params map[string]string) *Datasource {
+	p := C.mapnik_parameters()
+	defer C.mapnik_parameters_free(p)
+	for k, v := range params {
+		kcs := C.CString(k)
+		defer C.free(unsafe.Pointer(kcs))
+		vcs := C.CString(v)
+		defer C.free(unsafe.Pointer(vcs))
+		C.mapnik_parameters_set(p, kcs, vcs)
+	}
+	return &Datasource{C.mapnik_datasource(p)}
+}
+
+func (ds *Datasource) Free() {
+	C.mapnik_datasource_free(ds.ds)
+	ds.ds = nil
+}
+
+// Map layer
+type Layer struct {
+	l *C.struct__mapnik_layer_t
+}
+
+func NewLayer(name string, srs string) *Layer {
+	namecs := C.CString(name)
+	defer C.free(unsafe.Pointer(namecs))
+	srscs := C.CString(srs)
+	defer C.free(unsafe.Pointer(srscs))
+	return &Layer{C.mapnik_layer(namecs, srscs)}
+}
+
+func (l *Layer) Free() {
+	C.mapnik_layer_free(l.l)
+	l.l = nil
+}
+
+func (l *Layer) AddStyle(stylename string) {
+	cs := C.CString(stylename)
+	defer C.free(unsafe.Pointer(cs))
+	C.mapnik_layer_add_style(l.l, cs)
+}
+
+func (l *Layer) SetDatasource(ds *Datasource) {
+	C.mapnik_layer_set_datasource(l.l, ds.ds)
+}
+
 // Map base type
 type Map struct {
 	m *C.struct__mapnik_map_t
@@ -150,4 +201,8 @@ func (m *Map) Projection() Projection {
 
 func (m *Map) SetBufferSize(s int) {
 	C.mapnik_map_set_buffer_size(m.m, C.int(s))
+}
+
+func (m *Map) AddLayer(l *Layer) {
+	C.mapnik_map_add_layer(m.m, l.l)
 }

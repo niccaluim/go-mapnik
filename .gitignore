@@ -22,6 +22,4 @@ _testmain.go
 *.exe
 
 # Project-specifics
-mapnik/mapnik_c_api.cpp
-mapnik/mapnik_c_api.h
 mapnik/gen_import.go
