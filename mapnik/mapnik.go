@@ -206,3 +206,16 @@ func (m *Map) SetBufferSize(s int) {
 func (m *Map) AddLayer(l *Layer) {
 	C.mapnik_map_add_layer(m.m, l.l)
 }
+
+func (m *Map) SetActiveLayer(lname string) {
+	n := int(C.mapnik_map_layer_count(m.m))
+	for i := 0; i < n; i++ {
+		l := C.mapnik_map_get_layer(m.m, C.size_t(i))
+		defer C.free(unsafe.Pointer(l))
+		if C.GoString(C.mapnik_layer_name(l)) == lname {
+			C.mapnik_layer_set_active(l, 1);
+		} else {
+			C.mapnik_layer_set_active(l, 0);
+		}
+	}
+}

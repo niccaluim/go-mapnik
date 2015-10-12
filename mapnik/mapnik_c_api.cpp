@@ -258,6 +258,22 @@ void mapnik_map_add_layer(mapnik_map_t *m, mapnik_layer_t *l) {
     }
 }
 
+size_t mapnik_map_layer_count(mapnik_map_t *m) {
+    if (m && m->m) {
+        return m->m->layer_count();
+    }
+    return 0;
+}
+
+mapnik_layer_t * mapnik_map_get_layer(mapnik_map_t *m, size_t i) {
+    if (m && m->m && i < m->m->layer_count()) {
+        mapnik_layer_t * l = new mapnik_layer_t;
+        l->l = &m->m->layers()[i];
+        return l;
+    }
+    return NULL;
+}
+
 void mapnik_image_blob_free(mapnik_image_blob_t * b) {
     if (b) {
         if (b->ptr)
@@ -347,6 +363,19 @@ void mapnik_layer_add_style(mapnik_layer_t *l, const char *stylename) {
 void mapnik_layer_set_datasource(mapnik_layer_t *l, mapnik_datasource_t *ds) {
     if (l && l->l && ds && ds->ds) {
         l->l->set_datasource(ds->ds);
+    }
+}
+
+const char *mapnik_layer_name(mapnik_layer_t *l) {
+    if (l && l->l) {
+        return l->l->name().c_str();
+    }
+    return NULL;
+}
+
+void mapnik_layer_set_active(mapnik_layer_t *l, int active) {
+    if (l && l->l) {
+        l->l->set_active(active);
     }
 }
 

@@ -83,6 +83,10 @@ MAPNIKCAPICALL void mapnik_layer_add_style(mapnik_layer_t *l, const char *stylen
 
 MAPNIKCAPICALL void mapnik_layer_set_datasource(mapnik_layer_t *l, mapnik_datasource_t *ds);
 
+MAPNIKCAPICALL const char *mapnik_layer_name(mapnik_layer_t *l);
+
+MAPNIKCAPICALL void mapnik_layer_set_active(mapnik_layer_t *l, int active);
+
 
 //  Map
 typedef struct _mapnik_map_t mapnik_map_t;
@@ -116,6 +120,10 @@ MAPNIKCAPICALL mapnik_projection_t * mapnik_map_projection(mapnik_map_t *m);
 MAPNIKCAPICALL mapnik_image_t * mapnik_map_render_to_image(mapnik_map_t * m);
 
 MAPNIKCAPICALL void mapnik_map_add_layer(mapnik_map_t *m, mapnik_layer_t *l);
+
+MAPNIKCAPICALL size_t mapnik_map_layer_count(mapnik_map_t *m);
+
+MAPNIKCAPICALL mapnik_layer_t * mapnik_map_get_layer(mapnik_map_t *m, size_t i);
 
 #ifdef __cplusplus
 }
