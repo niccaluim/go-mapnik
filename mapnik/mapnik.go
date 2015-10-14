@@ -213,9 +213,9 @@ func (m *Map) SetActiveLayer(lname string) {
 		l := C.mapnik_map_get_layer(m.m, C.size_t(i))
 		defer C.free(unsafe.Pointer(l))
 		if C.GoString(C.mapnik_layer_name(l)) == lname {
-			C.mapnik_layer_set_active(l, 1);
+			C.mapnik_layer_set_active(l, 1)
 		} else {
-			C.mapnik_layer_set_active(l, 0);
+			C.mapnik_layer_set_active(l, 0)
 		}
 	}
 }
