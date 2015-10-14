@@ -7,6 +7,7 @@
 #include <mapnik/datasource_cache.hpp>
 #include <mapnik/projection.hpp>
 #include <mapnik/font_engine_freetype.hpp>
+#include <mapnik/layer.hpp>
 
 #if MAPNIK_VERSION >= 300000
 #include <mapnik/image.hpp>
@@ -254,7 +255,11 @@ mapnik_image_t * mapnik_map_render_to_image(mapnik_map_t * m) {
 
 void mapnik_map_add_layer(mapnik_map_t *m, mapnik_layer_t *l) {
     if (m && m->m && l && l->l) {
+#if MAPNIK_VERSION >= 300000
+        m->m->add_layer(*(l->l));
+#else
         m->m->addLayer(*(l->l));
+#endif
     }
 }
 
