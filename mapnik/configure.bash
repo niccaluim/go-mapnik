@@ -3,7 +3,7 @@
 cat > gen_import.go <<EOF
 package mapnik
 // #cgo CXXFLAGS: $(mapnik-config --cflags)
-// #cgo LDFLAGS: $(mapnik-config --ldflags) $(mapnik-config --libs) $(mapnik-config --dep-libs)
+// #cgo LDFLAGS: $(mapnik-config --libs) $(mapnik-config --dep-libs) -lpng
 import "C"
 
 const (
