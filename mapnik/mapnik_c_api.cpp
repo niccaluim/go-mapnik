@@ -8,6 +8,9 @@
 #include <mapnik/projection.hpp>
 #include <mapnik/font_engine_freetype.hpp>
 #include <mapnik/layer.hpp>
+#include <mapnik/grid/grid.hpp>
+#include <mapnik/grid/grid_renderer.hpp>
+#include <json/json.h>
 
 #if MAPNIK_VERSION >= 300000
 #include <mapnik/image.hpp>
@@ -53,6 +56,58 @@ int mapnik_register_fonts(const char* path, char** err) {
         }
         return -1;
     }
+}
+
+struct _mapnik_grid_t {
+    mapnik::grid * g;
+};
+
+void mapnik_grid_free(mapnik_grid_t * g) {
+    if (g) {
+        if (g->g) delete g->g;
+        delete g;
+    }
+}
+
+char * mapnik_grid_to_json(mapnik_grid_t * g) {
+    char * json = NULL;
+    if (g && g->g) {
+        Json::Value root(Json::objectValue);
+
+        root["grid"] = Json::Value(Json::arrayValue);
+        for (std::size_t y = 0; y < g->g->data().height(); y++) {
+            const mapnik::value_integer * row = g->g->get_row(y);
+            std::string s;
+            for (std::size_t x = 0; x < g->g->data().width(); x++) {
+                mapnik::value_integer id = row[x] + 32;
+                if (id >= 34) id++;
+                if (id >= 92) id++;
+
+                if (id <= 0x7f) {
+                    s += (char) id;
+                } else if (id <= 0x7ff) {
+                    s += (char) (0xc0 | (id >> 6));
+                    s += (char) (0x80 | (id & 0x3f));
+                } else if (id <= 0xffff) {
+                    s += (char) (0xe0 | (id >> 12));
+                    s += (char) (0x80 | ((id >> 6) & 0x3f));
+                    s += (char) (0x80 | (id & 0x3f));
+                } else if (id <= 0x1fffff) {
+                    s += (char) (0xe0 | (id >> 18));
+                    s += (char) (0x80 | ((id >> 12) & 0x3f));
+                    s += (char) (0x80 | ((id >> 6) & 0x3f));
+                    s += (char) (0x80 | (id & 0x3f));
+                }
+            }
+            root["grid"].append(s);
+        }
+
+        Json::StreamWriterBuilder wbuilder;
+        std::string s = Json::writeString(wbuilder, root);
+        json = new char[s.size()+1];
+        memcpy(json, s.c_str(), s.size()+1);
+    }
+    return json;
 }
 
 struct _mapnik_map_t {
@@ -237,8 +292,9 @@ void mapnik_image_free(mapnik_image_t * i) {
 
 mapnik_image_t * mapnik_map_render_to_image(mapnik_map_t * m) {
     mapnik_map_reset_last_error(m);
-    mapnik_image_type * im = new mapnik_image_type(m->m->width(), m->m->height());
+    mapnik_image_type * im = NULL;
     if (m && m->m) {
+        im = new mapnik_image_type(m->m->width(), m->m->height());
         try {
             mapnik::agg_renderer<mapnik_image_type> ren(*m->m,*im);
             ren.apply();
@@ -279,7 +335,26 @@ mapnik_layer_t * mapnik_map_get_layer(mapnik_map_t *m, size_t i) {
     return NULL;
 }
 
-void mapnik_image_blob_free(mapnik_image_blob_t * b) {
+mapnik_grid_t * mapnik_map_render_to_grid(mapnik_map_t * m, const char * key) {
+    mapnik_map_reset_last_error(m);
+    mapnik::grid * grid = NULL;
+    if (m && m->m) {
+        grid = new mapnik::grid(m->m->width()/2, m->m->height()/2, key);
+        try {
+            mapnik::grid_renderer<mapnik::grid> ren(*m->m,*grid);
+            ren.apply();
+        } catch (std::exception const& ex) {
+            delete grid;
+            m->err = new std::string(ex.what());
+            return NULL;
+        }
+    }
+    mapnik_grid_t * g = new mapnik_grid_t;
+    g->g = grid;
+    return g;
+}
+
+void mapnik_blob_free(mapnik_blob_t * b) {
     if (b) {
         if (b->ptr)
             delete[] b->ptr;
@@ -287,8 +362,8 @@ void mapnik_image_blob_free(mapnik_image_blob_t * b) {
     }
 }
 
-mapnik_image_blob_t * mapnik_image_to_png_blob(mapnik_image_t * i) {
-    mapnik_image_blob_t * blob = new mapnik_image_blob_t;
+mapnik_blob_t * mapnik_image_to_png_blob(mapnik_image_t * i) {
+    mapnik_blob_t * blob = new mapnik_blob_t;
     blob->ptr = NULL;
     blob->len = 0;
     if (i && i->i) {

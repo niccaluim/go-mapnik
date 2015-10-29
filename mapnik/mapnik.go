@@ -189,8 +189,24 @@ func (m *Map) RenderToMemoryPng() ([]byte, error) {
 	}
 	defer C.mapnik_image_free(i)
 	b := C.mapnik_image_to_png_blob(i)
-	defer C.mapnik_image_blob_free(b)
+	defer C.mapnik_blob_free(b)
 	return C.GoBytes(unsafe.Pointer(b.ptr), C.int(b.len)), nil
+}
+
+func (m *Map) RenderToMemoryUTFGrid(key string) (string, error) {
+	cs := C.CString(key)
+	defer C.free(unsafe.Pointer(cs))
+	g := C.mapnik_map_render_to_grid(m.m, cs)
+	if g == nil {
+		return "", m.lastError()
+	}
+	defer C.mapnik_grid_free(g)
+	json := C.mapnik_grid_to_json(g)
+	if json == nil {
+		return "", m.lastError()
+	}
+	defer C.free(unsafe.Pointer(json))
+	return C.GoString(json), nil
 }
 
 func (m *Map) Projection() Projection {

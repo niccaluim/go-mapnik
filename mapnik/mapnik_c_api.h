@@ -39,19 +39,21 @@ MAPNIKCAPICALL mapnik_bbox_t * mapnik_bbox(double minx, double miny, double maxx
 MAPNIKCAPICALL void mapnik_bbox_free(mapnik_bbox_t * b);
 
 
+// Blob
+typedef struct _mapnik_blob_t {
+    char *ptr;
+    unsigned int len;
+} mapnik_blob_t;
+
+MAPNIKCAPICALL void mapnik_blob_free(mapnik_blob_t * b);
+
+
 // Image
 typedef struct _mapnik_image_t mapnik_image_t;
 
 MAPNIKCAPICALL void mapnik_image_free(mapnik_image_t * i);
 
-typedef struct _mapnik_image_blob_t {
-    char *ptr;
-    unsigned int len;
-} mapnik_image_blob_t;
-
-MAPNIKCAPICALL void mapnik_image_blob_free(mapnik_image_blob_t * b);
-
-MAPNIKCAPICALL mapnik_image_blob_t * mapnik_image_to_png_blob(mapnik_image_t * i);
+MAPNIKCAPICALL mapnik_blob_t * mapnik_image_to_png_blob(mapnik_image_t * i);
 
 
 // Parameters
@@ -86,6 +88,14 @@ MAPNIKCAPICALL void mapnik_layer_set_datasource(mapnik_layer_t *l, mapnik_dataso
 MAPNIKCAPICALL const char *mapnik_layer_name(mapnik_layer_t *l);
 
 MAPNIKCAPICALL void mapnik_layer_set_active(mapnik_layer_t *l, int active);
+
+
+// Grid
+typedef struct _mapnik_grid_t mapnik_grid_t;
+
+MAPNIKCAPICALL void mapnik_grid_free(mapnik_grid_t * g);
+
+MAPNIKCAPICALL char * mapnik_grid_to_json(mapnik_grid_t * g);
 
 
 //  Map
@@ -124,6 +134,9 @@ MAPNIKCAPICALL void mapnik_map_add_layer(mapnik_map_t *m, mapnik_layer_t *l);
 MAPNIKCAPICALL size_t mapnik_map_layer_count(mapnik_map_t *m);
 
 MAPNIKCAPICALL mapnik_layer_t * mapnik_map_get_layer(mapnik_map_t *m, size_t i);
+
+MAPNIKCAPICALL mapnik_grid_t * mapnik_map_render_to_grid(mapnik_map_t * m, const char * key);
+
 
 #ifdef __cplusplus
 }
