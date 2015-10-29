@@ -339,13 +339,18 @@ mapnik_grid_t * mapnik_map_render_to_grid(mapnik_map_t * m, const char * key) {
     mapnik_map_reset_last_error(m);
     mapnik::grid * grid = NULL;
     if (m && m->m) {
-        grid = new mapnik::grid(m->m->width()/2, m->m->height()/2, key);
+        unsigned mw = m->m->width();
+        unsigned mh = m->m->height();
+        grid = new mapnik::grid(mw/2, mh/2, key);
         try {
+            m->m->resize(mw/2, mh/2);
             mapnik::grid_renderer<mapnik::grid> ren(*m->m,*grid);
             ren.apply();
+            m->m->resize(mw, mh);
         } catch (std::exception const& ex) {
             delete grid;
             m->err = new std::string(ex.what());
+            m->m->resize(mw, mh);
             return NULL;
         }
     }
