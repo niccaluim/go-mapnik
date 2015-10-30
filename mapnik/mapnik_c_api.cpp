@@ -4,12 +4,14 @@
 #include <mapnik/image_util.hpp>
 #include <mapnik/agg_renderer.hpp>
 #include <mapnik/load_map.hpp>
+#include <mapnik/datasource.hpp>
 #include <mapnik/datasource_cache.hpp>
 #include <mapnik/projection.hpp>
 #include <mapnik/font_engine_freetype.hpp>
 #include <mapnik/layer.hpp>
 #include <mapnik/grid/grid.hpp>
 #include <mapnik/grid/grid_renderer.hpp>
+#include <mapnik/feature_layer_desc.hpp>
 #include <json/json.h>
 
 #if MAPNIK_VERSION >= 300000
@@ -102,9 +104,51 @@ char * mapnik_grid_to_json(mapnik_grid_t * g) {
             root["grid"].append(s);
         }
 
+        root["keys"] = Json::Value(Json::arrayValue);
+        root["data"] = Json::Value(Json::objectValue);
+        using feature_type = std::map<std::string, mapnik::feature_ptr>;
+        feature_type const& features = g->g->get_grid_features();
+        std::set<std::string> const& fields = g->g->get_fields();
+        feature_type::const_iterator fend = features.end();
+
+        using feature_keys_type = std::map<mapnik::value_integer, std::string>;
+        for (feature_keys_type::const_iterator it = g->g->get_feature_keys().begin();
+                it != g->g->get_feature_keys().end(); ++it) {
+            root["keys"].append(it->second);
+            feature_type::const_iterator fit = features.find(it->second);
+            if (fit == fend) continue;
+            Json::Value fmap = Json::Value(Json::objectValue);
+            mapnik::feature_ptr feature = fit->second;
+            for (std::string const& field : fields) {
+                if (feature->has_key(field)) {
+                    mapnik::feature_impl::value_type const& v = feature->get(field);
+                    switch(v.which()) { // :(
+                    case 0:
+                        // null value; do nothing
+                        break;
+                    case 1:
+                        fmap[field] = Json::Value(v.to_bool());
+                        break;
+                    case 2:
+                        fmap[field] = Json::Value(v.to_int());
+                        break;
+                    case 3:
+                        fmap[field] = Json::Value(v.to_double());
+                        break;
+                    case 4:
+                        fmap[field] = Json::Value(v.to_string());
+                        break;
+                    }
+                }
+            }
+            root["data"][it->second] = fmap;
+        }
+
         Json::StreamWriterBuilder wbuilder;
+        wbuilder["commentStyle"] = "None";
+        wbuilder["indentation"] = "";
         std::string s = Json::writeString(wbuilder, root);
-        json = new char[s.size()+1];
+        json = (char *) malloc(s.size()+1);
         memcpy(json, s.c_str(), s.size()+1);
     }
     return json;
@@ -335,17 +379,26 @@ mapnik_layer_t * mapnik_map_get_layer(mapnik_map_t *m, size_t i) {
     return NULL;
 }
 
-mapnik_grid_t * mapnik_map_render_to_grid(mapnik_map_t * m, const char * key) {
+mapnik_grid_t * mapnik_map_render_to_grid(mapnik_map_t * m, mapnik_layer_t * l) {
     mapnik_map_reset_last_error(m);
     mapnik::grid * grid = NULL;
-    if (m && m->m) {
+    if (m && m->m && l && l->l) {
         unsigned mw = m->m->width();
         unsigned mh = m->m->height();
-        grid = new mapnik::grid(mw/2, mh/2, key);
+        grid = new mapnik::grid(mw/2, mh/2, "__id__");
+
+        using attributes_type = std::vector<mapnik::attribute_descriptor>;
+        mapnik::layer_descriptor ld = l->l->datasource()->get_descriptor();
+        attributes_type const& descs = ld.get_descriptors();
+        for (attributes_type::const_iterator it = descs.begin(); it != descs.end(); ++it) {
+            grid->add_field(it->get_name());
+        }
+
         try {
             m->m->resize(mw/2, mh/2);
             mapnik::grid_renderer<mapnik::grid> ren(*m->m,*grid);
-            ren.apply();
+            std::set<std::string> fields(grid->get_fields());
+            ren.apply(*l->l, fields);
             m->m->resize(mw, mh);
         } catch (std::exception const& ex) {
             delete grid;

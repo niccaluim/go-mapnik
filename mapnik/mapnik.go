@@ -6,6 +6,7 @@ import "C"
 
 import (
 	"errors"
+	"fmt"
 	"unsafe"
 )
 
@@ -193,10 +194,22 @@ func (m *Map) RenderToMemoryPng() ([]byte, error) {
 	return C.GoBytes(unsafe.Pointer(b.ptr), C.int(b.len)), nil
 }
 
-func (m *Map) RenderToMemoryUTFGrid(key string) (string, error) {
-	cs := C.CString(key)
-	defer C.free(unsafe.Pointer(cs))
-	g := C.mapnik_map_render_to_grid(m.m, cs)
+func (m *Map) RenderToMemoryUTFGrid(lname string) (string, error) {
+	l := &Layer{}
+	n := int(C.mapnik_map_layer_count(m.m))
+	for i := 0; i < n; i++ {
+		ml := C.mapnik_map_get_layer(m.m, C.size_t(i))
+		defer C.free(unsafe.Pointer(ml))
+		if C.GoString(C.mapnik_layer_name(ml)) == lname {
+			l.l = ml
+			break
+		}
+	}
+	if l.l == nil {
+		return "", fmt.Errorf("no such layer %s", lname)
+	}
+
+	g := C.mapnik_map_render_to_grid(m.m, l.l)
 	if g == nil {
 		return "", m.lastError()
 	}

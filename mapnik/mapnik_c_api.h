@@ -135,7 +135,7 @@ MAPNIKCAPICALL size_t mapnik_map_layer_count(mapnik_map_t *m);
 
 MAPNIKCAPICALL mapnik_layer_t * mapnik_map_get_layer(mapnik_map_t *m, size_t i);
 
-MAPNIKCAPICALL mapnik_grid_t * mapnik_map_render_to_grid(mapnik_map_t * m, const char * key);
+MAPNIKCAPICALL mapnik_grid_t * mapnik_map_render_to_grid(mapnik_map_t * m, mapnik_layer_t * l);
 
 
 #ifdef __cplusplus
