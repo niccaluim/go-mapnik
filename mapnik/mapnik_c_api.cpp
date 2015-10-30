@@ -130,7 +130,7 @@ char * mapnik_grid_to_json(mapnik_grid_t * g) {
                         fmap[field] = Json::Value(v.to_bool());
                         break;
                     case 2:
-                        fmap[field] = Json::Value(v.to_int());
+                        fmap[field] = Json::Value((Json::LargestInt) v.to_int());
                         break;
                     case 3:
                         fmap[field] = Json::Value(v.to_double());
