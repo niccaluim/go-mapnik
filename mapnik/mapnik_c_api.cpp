@@ -164,48 +164,10 @@ char * mapnik_grid_to_json(mapnik_grid_t * g, unsigned res) {
             }
             root["data"][itr->first] = feature_json;
         }
-//
-//
-//         using feature_type = std::map<std::string, mapnik::feature_ptr>;
-//         feature_type const& features = g->g->get_grid_features();
-//         std::set<std::string> const& fields = g->g->get_fields();
-//         feature_type::const_iterator fend = features.end();
-//
-//         for (feature_keys_type::const_iterator it = g->g->get_feature_keys().begin();
-//                 it != g->g->get_feature_keys().end(); ++it) {
-//             root["keys"].append(it->second);
-//             feature_type::const_iterator fit = features.find(it->second);
-//             if (fit == fend) continue;
-//             Json::Value fmap = Json::Value(Json::objectValue);
-//             mapnik::feature_ptr feature = fit->second;
-//             for (std::string const& field : fields) {
-//                 if (feature->has_key(field)) {
-//                     mapnik::feature_impl::value_type const& v = feature->get(field);
-//                     switch(v.which()) { // :(
-//                     case 0:
-//                         // null value; do nothing
-//                         break;
-//                     case 1:
-//                         fmap[field] = Json::Value(v.to_bool());
-//                         break;
-//                     case 2:
-//                         fmap[field] = Json::Value((Json::LargestInt) v.to_int());
-//                         break;
-//                     case 3:
-//                         fmap[field] = Json::Value(v.to_double());
-//                         break;
-//                     case 4:
-//                         fmap[field] = Json::Value(v.to_string());
-//                         break;
-//                     }
-//                 }
-//             }
-//             root["data"][it->second] = fmap;
-//         }
 
         Json::StreamWriterBuilder wbuilder;
         wbuilder["commentStyle"] = "None";
-//         wbuilder["indentation"] = "";
+        wbuilder["indentation"] = "";
         std::string s = Json::writeString(wbuilder, root);
         json = (char *) malloc(s.size()+1);
         memcpy(json, s.c_str(), s.size()+1);
