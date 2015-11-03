@@ -95,7 +95,7 @@ typedef struct _mapnik_grid_t mapnik_grid_t;
 
 MAPNIKCAPICALL void mapnik_grid_free(mapnik_grid_t * g);
 
-MAPNIKCAPICALL char * mapnik_grid_to_json(mapnik_grid_t * g);
+MAPNIKCAPICALL char * mapnik_grid_to_json(mapnik_grid_t * g, unsigned res);
 
 
 //  Map
@@ -135,7 +135,7 @@ MAPNIKCAPICALL size_t mapnik_map_layer_count(mapnik_map_t *m);
 
 MAPNIKCAPICALL mapnik_layer_t * mapnik_map_get_layer(mapnik_map_t *m, size_t i);
 
-MAPNIKCAPICALL mapnik_grid_t * mapnik_map_render_to_grid(mapnik_map_t * m, mapnik_layer_t * l);
+MAPNIKCAPICALL mapnik_grid_t * mapnik_map_render_to_grid(mapnik_map_t * m, mapnik_layer_t * l, const char * key);
 
 
 #ifdef __cplusplus

@@ -71,55 +71,76 @@ void mapnik_grid_free(mapnik_grid_t * g) {
     }
 }
 
-char * mapnik_grid_to_json(mapnik_grid_t * g) {
+void utf8_append(std::string& s, unsigned cp) {
+    if (cp <= 0x7f) {
+        s += (char) cp;
+    } else if (cp <= 0x7ff) {
+        s += (char) (0xc0 | (cp >> 6));
+        s += (char) (0x80 | (cp & 0x3f));
+    } else if (cp <= 0xffff) {
+        s += (char) (0xe0 | (cp >> 12));
+        s += (char) (0x80 | ((cp >> 6) & 0x3f));
+        s += (char) (0x80 | (cp & 0x3f));
+    } else if (cp <= 0x1fffff) {
+        s += (char) (0xf0 | (cp >> 18));
+        s += (char) (0x80 | ((cp >> 12) & 0x3f));
+        s += (char) (0x80 | ((cp >> 6) & 0x3f));
+        s += (char) (0x80 | (cp & 0x3f));
+    }
+}
+
+char * mapnik_grid_to_json(mapnik_grid_t * g, unsigned res) {
     char * json = NULL;
     if (g && g->g) {
         Json::Value root(Json::objectValue);
-
+        root["keys"] = Json::Value(Json::arrayValue);
+        root["data"] = Json::Value(Json::objectValue);
         root["grid"] = Json::Value(Json::arrayValue);
-        for (std::size_t y = 0; y < g->g->data().height(); y++) {
+
+        using feature_keys_type = std::map<mapnik::value_integer, std::string>;
+        feature_keys_type feature_keys = g->g->get_feature_keys();
+        feature_keys_type::const_iterator feature_key_itr;
+
+        using keys_type = std::map<mapnik::grid::lookup_type, mapnik::grid::value_type>;
+        keys_type keys;
+        unsigned codepoint = ' ';
+
+        for (std::size_t y = 0; y < g->g->data().height(); y=y+res) {
             const mapnik::value_integer * row = g->g->get_row(y);
             std::string s;
-            for (std::size_t x = 0; x < g->g->data().width(); x++) {
-                mapnik::value_integer id = row[x] + 32;
-                if (id >= 34) id++;
-                if (id >= 92) id++;
+            for (std::size_t x = 0; x < g->g->data().width(); x=x+res) {
+                feature_key_itr = feature_keys.find(row[x]);
+                if (feature_key_itr == feature_keys.end()) continue;
 
-                if (id <= 0x7f) {
-                    s += (char) id;
-                } else if (id <= 0x7ff) {
-                    s += (char) (0xc0 | (id >> 6));
-                    s += (char) (0x80 | (id & 0x3f));
-                } else if (id <= 0xffff) {
-                    s += (char) (0xe0 | (id >> 12));
-                    s += (char) (0x80 | ((id >> 6) & 0x3f));
-                    s += (char) (0x80 | (id & 0x3f));
-                } else if (id <= 0x1fffff) {
-                    s += (char) (0xe0 | (id >> 18));
-                    s += (char) (0x80 | ((id >> 12) & 0x3f));
-                    s += (char) (0x80 | ((id >> 6) & 0x3f));
-                    s += (char) (0x80 | (id & 0x3f));
+                mapnik::grid::lookup_type key = feature_key_itr->second;
+                keys_type::iterator key_itr = keys.find(key);
+                if (key_itr == keys.end()) {
+                    if (row[x] == mapnik::grid::base_mask) {
+                        keys[""] = codepoint;
+                        root["keys"].append("");
+                    } else {
+                        keys[key] = codepoint;
+                        root["keys"].append(key);
+                    }
+                    utf8_append(s, codepoint);
+                    codepoint++;
+                    if (codepoint == '"' || codepoint == '\\') codepoint++;
+                } else {
+                    utf8_append(s, key_itr->second);
                 }
             }
             root["grid"].append(s);
         }
 
-        root["keys"] = Json::Value(Json::arrayValue);
-        root["data"] = Json::Value(Json::objectValue);
-        using feature_type = std::map<std::string, mapnik::feature_ptr>;
-        feature_type const& features = g->g->get_grid_features();
-        std::set<std::string> const& fields = g->g->get_fields();
-        feature_type::const_iterator fend = features.end();
+        using features_type = std::map<mapnik::grid::lookup_type, mapnik::feature_ptr>;
+        features_type const& features = g->g->get_grid_features();
+        for (keys_type::iterator itr = keys.begin(); itr != keys.end(); itr++) {
+            features_type::const_iterator feature_itr = features.find(itr->first);
+            if (feature_itr == features.end()) continue;
+            mapnik::feature_ptr feature = feature_itr->second;
 
-        using feature_keys_type = std::map<mapnik::value_integer, std::string>;
-        for (feature_keys_type::const_iterator it = g->g->get_feature_keys().begin();
-                it != g->g->get_feature_keys().end(); ++it) {
-            root["keys"].append(it->second);
-            feature_type::const_iterator fit = features.find(it->second);
-            if (fit == fend) continue;
-            Json::Value fmap = Json::Value(Json::objectValue);
-            mapnik::feature_ptr feature = fit->second;
-            for (std::string const& field : fields) {
+            Json::Value feature_json = Json::Value(Json::objectValue);
+            for (std::string const& field : g->g->get_fields()) {
                 if (feature->has_key(field)) {
                     mapnik::feature_impl::value_type const& v = feature->get(field);
                     switch(v.which()) { // :(
@@ -127,26 +148,64 @@ char * mapnik_grid_to_json(mapnik_grid_t * g) {
                         // null value; do nothing
                         break;
                     case 1:
-                        fmap[field] = Json::Value(v.to_bool());
+                        feature_json[field] = Json::Value(v.to_bool());
                         break;
                     case 2:
-                        fmap[field] = Json::Value((Json::LargestInt) v.to_int());
+                        feature_json[field] = Json::Value((Json::LargestInt) v.to_int());
                         break;
                     case 3:
-                        fmap[field] = Json::Value(v.to_double());
+                        feature_json[field] = Json::Value(v.to_double());
                         break;
                     case 4:
-                        fmap[field] = Json::Value(v.to_string());
+                        feature_json[field] = Json::Value(v.to_string());
                         break;
                     }
                 }
             }
-            root["data"][it->second] = fmap;
+            root["data"][itr->first] = feature_json;
         }
+//
+//
+//         using feature_type = std::map<std::string, mapnik::feature_ptr>;
+//         feature_type const& features = g->g->get_grid_features();
+//         std::set<std::string> const& fields = g->g->get_fields();
+//         feature_type::const_iterator fend = features.end();
+//
+//         for (feature_keys_type::const_iterator it = g->g->get_feature_keys().begin();
+//                 it != g->g->get_feature_keys().end(); ++it) {
+//             root["keys"].append(it->second);
+//             feature_type::const_iterator fit = features.find(it->second);
+//             if (fit == fend) continue;
+//             Json::Value fmap = Json::Value(Json::objectValue);
+//             mapnik::feature_ptr feature = fit->second;
+//             for (std::string const& field : fields) {
+//                 if (feature->has_key(field)) {
+//                     mapnik::feature_impl::value_type const& v = feature->get(field);
+//                     switch(v.which()) { // :(
+//                     case 0:
+//                         // null value; do nothing
+//                         break;
+//                     case 1:
+//                         fmap[field] = Json::Value(v.to_bool());
+//                         break;
+//                     case 2:
+//                         fmap[field] = Json::Value((Json::LargestInt) v.to_int());
+//                         break;
+//                     case 3:
+//                         fmap[field] = Json::Value(v.to_double());
+//                         break;
+//                     case 4:
+//                         fmap[field] = Json::Value(v.to_string());
+//                         break;
+//                     }
+//                 }
+//             }
+//             root["data"][it->second] = fmap;
+//         }
 
         Json::StreamWriterBuilder wbuilder;
         wbuilder["commentStyle"] = "None";
-        wbuilder["indentation"] = "";
+//         wbuilder["indentation"] = "";
         std::string s = Json::writeString(wbuilder, root);
         json = (char *) malloc(s.size()+1);
         memcpy(json, s.c_str(), s.size()+1);
@@ -379,13 +438,11 @@ mapnik_layer_t * mapnik_map_get_layer(mapnik_map_t *m, size_t i) {
     return NULL;
 }
 
-mapnik_grid_t * mapnik_map_render_to_grid(mapnik_map_t * m, mapnik_layer_t * l) {
+mapnik_grid_t * mapnik_map_render_to_grid(mapnik_map_t * m, mapnik_layer_t * l, const char * key) {
     mapnik_map_reset_last_error(m);
     mapnik::grid * grid = NULL;
     if (m && m->m && l && l->l) {
-        unsigned mw = m->m->width();
-        unsigned mh = m->m->height();
-        grid = new mapnik::grid(mw/2, mh/2, "__id__");
+        grid = new mapnik::grid(m->m->width(), m->m->height(), key);
 
         using attributes_type = std::vector<mapnik::attribute_descriptor>;
         mapnik::layer_descriptor ld = l->l->datasource()->get_descriptor();
@@ -395,15 +452,12 @@ mapnik_grid_t * mapnik_map_render_to_grid(mapnik_map_t * m, mapnik_layer_t * l) 
         }
 
         try {
-            m->m->resize(mw/2, mh/2);
             mapnik::grid_renderer<mapnik::grid> ren(*m->m,*grid);
             std::set<std::string> fields(grid->get_fields());
-            ren.apply(*l->l, fields);
-            m->m->resize(mw, mh);
+            ren.apply(*l->l, fields, 4);
         } catch (std::exception const& ex) {
             delete grid;
             m->err = new std::string(ex.what());
-            m->m->resize(mw, mh);
             return NULL;
         }
     }

@@ -194,7 +194,7 @@ func (m *Map) RenderToMemoryPng() ([]byte, error) {
 	return C.GoBytes(unsafe.Pointer(b.ptr), C.int(b.len)), nil
 }
 
-func (m *Map) RenderToMemoryUTFGrid(lname string) (string, error) {
+func (m *Map) RenderToMemoryUTFGrid(lname string, key string, res uint) (string, error) {
 	l := &Layer{}
 	n := int(C.mapnik_map_layer_count(m.m))
 	for i := 0; i < n; i++ {
@@ -209,12 +209,14 @@ func (m *Map) RenderToMemoryUTFGrid(lname string) (string, error) {
 		return "", fmt.Errorf("no such layer %s", lname)
 	}
 
-	g := C.mapnik_map_render_to_grid(m.m, l.l)
+	cs := C.CString(key)
+	defer C.free(unsafe.Pointer(cs))
+	g := C.mapnik_map_render_to_grid(m.m, l.l, cs)
 	if g == nil {
 		return "", m.lastError()
 	}
 	defer C.mapnik_grid_free(g)
-	json := C.mapnik_grid_to_json(g)
+	json := C.mapnik_grid_to_json(g, C.uint(res))
 	if json == nil {
 		return "", m.lastError()
 	}
