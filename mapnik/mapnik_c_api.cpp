@@ -22,16 +22,19 @@
 
 #if MAPNIK_VERSION >= 300000
 #include <mapnik/image.hpp>
-#define mapnik_image_type mapnik::image_rgba8
+#define mapnik_image_type image_rgba8
 #else
 #include <mapnik/graphics.hpp>
-#define mapnik_image_type mapnik::image_32
+#define mapnik_image_type image_32
 #endif
 
 
 #include "mapnik_c_api.h"
 
 #include <stdlib.h>
+
+using namespace std;
+using namespace mapnik;
 
 #ifdef __cplusplus
 extern "C"
@@ -41,12 +44,12 @@ extern "C"
 int mapnik_register_datasources(const char* path, char** err) {
     try {
 #if MAPNIK_VERSION >= 200200
-        mapnik::datasource_cache::instance().register_datasources(path);
+        datasource_cache::instance().register_datasources(path);
 #else
-        mapnik::datasource_cache::instance()->register_datasources(path);
+        datasource_cache::instance()->register_datasources(path);
 #endif
         return 0;
-    } catch (std::exception const& ex) {
+    } catch (exception const& ex) {
         if (err != NULL) {
             *err = strdup(ex.what());
         }
@@ -56,9 +59,9 @@ int mapnik_register_datasources(const char* path, char** err) {
 
 int mapnik_register_fonts(const char* path, char** err) {
     try {
-        mapnik::freetype_engine::register_fonts(path);
+        freetype_engine::register_fonts(path);
         return 0;
-    } catch (std::exception const& ex) {
+    } catch (exception const& ex) {
         if (err != NULL) {
             *err = strdup(ex.what());
         }
@@ -67,7 +70,7 @@ int mapnik_register_fonts(const char* path, char** err) {
 }
 
 struct _mapnik_grid_t {
-    mapnik::grid * g;
+    grid * g;
 };
 
 void mapnik_grid_free(mapnik_grid_t * g) {
@@ -77,7 +80,7 @@ void mapnik_grid_free(mapnik_grid_t * g) {
     }
 }
 
-void utf8_append(std::string& s, unsigned cp) {
+void utf8_append(string& s, unsigned cp) {
     if (cp <= 0x7f) {
         s += (char) cp;
     } else if (cp <= 0x7ff) {
@@ -103,25 +106,25 @@ char * mapnik_grid_to_json(mapnik_grid_t * g, unsigned res) {
         root["data"] = Json::Value(Json::objectValue);
         root["grid"] = Json::Value(Json::arrayValue);
 
-        using feature_keys_type = std::map<mapnik::value_integer, std::string>;
+        using feature_keys_type = map<value_integer, string>;
         feature_keys_type feature_keys = g->g->get_feature_keys();
         feature_keys_type::const_iterator feature_key_itr;
 
-        using keys_type = std::map<mapnik::grid::lookup_type, mapnik::grid::value_type>;
+        using keys_type = map<grid::lookup_type, grid::value_type>;
         keys_type keys;
         unsigned codepoint = ' ';
 
-        for (std::size_t y = 0; y < g->g->data().height(); y=y+res) {
-            const mapnik::value_integer * row = g->g->get_row(y);
-            std::string s;
-            for (std::size_t x = 0; x < g->g->data().width(); x=x+res) {
+        for (size_t y = 0; y < g->g->data().height(); y=y+res) {
+            const value_integer * row = g->g->get_row(y);
+            string s;
+            for (size_t x = 0; x < g->g->data().width(); x=x+res) {
                 feature_key_itr = feature_keys.find(row[x]);
                 if (feature_key_itr == feature_keys.end()) continue;
 
-                mapnik::grid::lookup_type key = feature_key_itr->second;
+                grid::lookup_type key = feature_key_itr->second;
                 keys_type::iterator key_itr = keys.find(key);
                 if (key_itr == keys.end()) {
-                    if (row[x] == mapnik::grid::base_mask) {
+                    if (row[x] == grid::base_mask) {
                         keys[""] = codepoint;
                         root["keys"].append("");
                     } else {
@@ -138,17 +141,17 @@ char * mapnik_grid_to_json(mapnik_grid_t * g, unsigned res) {
             root["grid"].append(s);
         }
 
-        using features_type = std::map<mapnik::grid::lookup_type, mapnik::feature_ptr>;
+        using features_type = map<grid::lookup_type, feature_ptr>;
         features_type const& features = g->g->get_grid_features();
         for (keys_type::iterator itr = keys.begin(); itr != keys.end(); itr++) {
             features_type::const_iterator feature_itr = features.find(itr->first);
             if (feature_itr == features.end()) continue;
-            mapnik::feature_ptr feature = feature_itr->second;
+            feature_ptr feature = feature_itr->second;
 
             Json::Value feature_json = Json::Value(Json::objectValue);
-            for (std::string const& field : g->g->get_fields()) {
+            for (string const& field : g->g->get_fields()) {
                 if (feature->has_key(field)) {
-                    mapnik::feature_impl::value_type const& v = feature->get(field);
+                    feature_impl::value_type const& v = feature->get(field);
                     switch(v.which()) { // :(
                     case 0:
                         // null value; do nothing
@@ -174,7 +177,7 @@ char * mapnik_grid_to_json(mapnik_grid_t * g, unsigned res) {
         Json::StreamWriterBuilder wbuilder;
         wbuilder["commentStyle"] = "None";
         wbuilder["indentation"] = "";
-        std::string s = Json::writeString(wbuilder, root);
+        string s = Json::writeString(wbuilder, root);
         json = (char *) malloc(s.size()+1);
         memcpy(json, s.c_str(), s.size()+1);
     }
@@ -182,17 +185,17 @@ char * mapnik_grid_to_json(mapnik_grid_t * g, unsigned res) {
 }
 
 struct _mapnik_map_t {
-    mapnik::Map * m;
-    std::string * err;
+    Map * m;
+    string * err;
 };
 
 struct _mapnik_layer_t {
-    mapnik::layer *l;
+    layer *l;
 };
 
 mapnik_map_t * mapnik_map(unsigned width, unsigned height) {
     mapnik_map_t * map = new mapnik_map_t;
-    map->m = new mapnik::Map(width,height);
+    map->m = new Map(width,height);
     map->err = NULL;
     return map;
 }
@@ -226,9 +229,9 @@ int mapnik_map_load(mapnik_map_t * m, const char* stylesheet) {
     mapnik_map_reset_last_error(m);
     if (m && m->m) {
         try {
-            mapnik::load_map(*m->m,stylesheet);
-        } catch (std::exception const& ex) {
-            m->err = new std::string(ex.what());
+            load_map(*m->m,stylesheet);
+        } catch (exception const& ex) {
+            m->err = new string(ex.what());
             return -1;
         }
         return 0;
@@ -240,9 +243,9 @@ int mapnik_map_load_string(mapnik_map_t * m, const char* stylesheet_string) {
     mapnik_map_reset_last_error(m);
     if (m && m->m) {
         try {
-            mapnik::load_map_string(*m->m, stylesheet_string);
-        } catch (std::exception const& ex) {
-            m->err = new std::string(ex.what());
+            load_map_string(*m->m, stylesheet_string);
+        } catch (exception const& ex) {
+            m->err = new string(ex.what());
             return -1;
         }
         return 0;
@@ -255,8 +258,8 @@ int mapnik_map_zoom_all(mapnik_map_t * m) {
     if (m && m->m) {
         try {
             m->m->zoom_all();
-        } catch (std::exception const& ex) {
-            m->err = new std::string(ex.what());
+        } catch (exception const& ex) {
+            m->err = new string(ex.what());
             return -1;
         }
         return 0;
@@ -283,11 +286,11 @@ int mapnik_map_render_to_file(mapnik_map_t * m, const char* filepath) {
     if (m && m->m) {
         try {
             mapnik_image_type buf(m->m->width(),m->m->height());
-            mapnik::agg_renderer<mapnik_image_type> ren(*m->m,buf);
+            agg_renderer<mapnik_image_type> ren(*m->m,buf);
             ren.apply();
-            mapnik::save_to_file(buf,filepath);
-        } catch (std::exception const& ex) {
-            m->err = new std::string(ex.what());
+            save_to_file(buf,filepath);
+        } catch (exception const& ex) {
+            m->err = new string(ex.what());
             return -1;
         }
         return 0;
@@ -315,13 +318,13 @@ const char *mapnik_map_last_error(mapnik_map_t *m) {
 }
 
 struct _mapnik_projection_t {
-    mapnik::projection * p;
+    projection * p;
 };
 
 mapnik_projection_t * mapnik_map_projection(mapnik_map_t *m) {
     mapnik_projection_t * proj = new mapnik_projection_t;
     if (m && m->m)
-        proj->p = new mapnik::projection(m->m->srs());
+        proj->p = new projection(m->m->srs());
     else
         proj->p = NULL;
     return proj;
@@ -344,12 +347,12 @@ mapnik_coord_t mapnik_projection_forward(mapnik_projection_t *p, mapnik_coord_t 
 }
 
 struct _mapnik_bbox_t {
-    mapnik::box2d<double> b;
+    box2d<double> b;
 };
 
 mapnik_bbox_t * mapnik_bbox(double minx, double miny, double maxx, double maxy) {
     mapnik_bbox_t * b = new mapnik_bbox_t;
-    b->b = mapnik::box2d<double>(minx, miny, maxx, maxy);
+    b->b = box2d<double>(minx, miny, maxx, maxy);
     return b;
 }
 
@@ -382,11 +385,11 @@ mapnik_image_t * mapnik_map_render_to_image(mapnik_map_t * m) {
     if (m && m->m) {
         im = new mapnik_image_type(m->m->width(), m->m->height());
         try {
-            mapnik::agg_renderer<mapnik_image_type> ren(*m->m,*im);
+            agg_renderer<mapnik_image_type> ren(*m->m,*im);
             ren.apply();
-        } catch (std::exception const& ex) {
+        } catch (exception const& ex) {
             delete im;
-            m->err = new std::string(ex.what());
+            m->err = new string(ex.what());
             return NULL;
         }
     }
@@ -424,30 +427,30 @@ mapnik_layer_t * mapnik_map_get_layer(mapnik_map_t *m, size_t i) {
 mapnik_grid_t * mapnik_map_render_to_grid(mapnik_map_t * m, mapnik_layer_t * l, const char * key) {
     ensure_readers_registered();
     mapnik_map_reset_last_error(m);
-    mapnik::grid * grid = NULL;
+    grid * g = NULL;
     if (m && m->m && l && l->l) {
-        grid = new mapnik::grid(m->m->width(), m->m->height(), key);
+        g = new grid(m->m->width(), m->m->height(), key);
 
-        using attributes_type = std::vector<mapnik::attribute_descriptor>;
-        mapnik::layer_descriptor ld = l->l->datasource()->get_descriptor();
+        using attributes_type = vector<attribute_descriptor>;
+        layer_descriptor ld = l->l->datasource()->get_descriptor();
         attributes_type const& descs = ld.get_descriptors();
         for (attributes_type::const_iterator it = descs.begin(); it != descs.end(); ++it) {
-            grid->add_field(it->get_name());
+            g->add_field(it->get_name());
         }
 
         try {
-            mapnik::grid_renderer<mapnik::grid> ren(*m->m,*grid);
-            std::set<std::string> fields(grid->get_fields());
+            grid_renderer<grid> ren(*m->m,*g);
+            set<string> fields(g->get_fields());
             ren.apply(*l->l, fields, 4);
-        } catch (std::exception const& ex) {
-            delete grid;
-            m->err = new std::string(ex.what());
+        } catch (exception const& ex) {
+            delete g;
+            m->err = new string(ex.what());
             return NULL;
         }
     }
-    mapnik_grid_t * g = new mapnik_grid_t;
-    g->g = grid;
-    return g;
+    mapnik_grid_t * gg = new mapnik_grid_t;
+    gg->g = g;
+    return gg;
 }
 
 void mapnik_blob_free(mapnik_blob_t * b) {
@@ -463,7 +466,7 @@ mapnik_blob_t * mapnik_image_to_png_blob(mapnik_image_t * i) {
     blob->ptr = NULL;
     blob->len = 0;
     if (i && i->i) {
-        std::string s = save_to_string(*(i->i), "png256");
+        string s = save_to_string(*(i->i), "png256");
         blob->len = s.length();
         blob->ptr = new char[blob->len];
         memcpy(blob->ptr, s.c_str(), blob->len);
@@ -472,12 +475,12 @@ mapnik_blob_t * mapnik_image_to_png_blob(mapnik_image_t * i) {
 }
 
 struct _mapnik_parameters_t {
-    mapnik::parameters *p;
+    parameters *p;
 };
 
 mapnik_parameters_t *mapnik_parameters() {
     mapnik_parameters_t *params = new mapnik_parameters_t;
-    params->p = new mapnik::parameters;
+    params->p = new parameters;
     return params;
 }
 
@@ -495,16 +498,16 @@ void mapnik_parameters_set(mapnik_parameters_t *p, const char *key, const char *
 }
 
 struct _mapnik_datasource_t {
-    mapnik::datasource_ptr ds;
+    datasource_ptr ds;
 };
 
 mapnik_datasource_t *mapnik_datasource(mapnik_parameters_t *p) {
     if (p && p->p) {
         mapnik_datasource_t *ds = new mapnik_datasource_t;
 #if MAPNIK_VERSION >= 200200
-        ds->ds = mapnik::datasource_cache::instance().create(*(p->p));
+        ds->ds = datasource_cache::instance().create(*(p->p));
 #else
-        ds->ds = mapnik::datasource_cache::instance()->create(*(p->p));
+        ds->ds = datasource_cache::instance()->create(*(p->p));
 #endif
         return ds;
     }
@@ -518,9 +521,9 @@ void mapnik_datasource_free(mapnik_datasource_t *ds) {
 }
 
 mapnik_layer_t *mapnik_layer(const char *name, const char *srs) {
-    mapnik_layer_t *layer = new mapnik_layer_t;
-    layer->l = new mapnik::layer(name, srs);
-    return layer;
+    mapnik_layer_t *l = new mapnik_layer_t;
+    l->l = new layer(name, srs);
+    return l;
 }
 
 void mapnik_layer_free(mapnik_layer_t *l) {
