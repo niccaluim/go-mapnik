@@ -12,7 +12,13 @@
 #include <mapnik/grid/grid.hpp>
 #include <mapnik/grid/grid_renderer.hpp>
 #include <mapnik/feature_layer_desc.hpp>
+#include <mapnik/image_reader.hpp>
 #include <json/json.h>
+
+// see https://github.com/mapnik/mapnik/issues/811
+#ifdef HAVE_PNG
+#include "png_reader.h"
+#endif
 
 #if MAPNIK_VERSION >= 300000
 #include <mapnik/image.hpp>
@@ -258,7 +264,21 @@ int mapnik_map_zoom_all(mapnik_map_t * m) {
     return -1;
 }
 
+void ensure_readers_registered() {
+    static bool registered = false;
+    if (!registered) {
+        #ifdef HAVE_PNG
+        factory<image_reader, string, string const&>::instance().unregister_product("png");
+        factory<image_reader, string, char const*, size_t>::instance().unregister_product("png");
+        register_image_reader("png", png_reader_for_file);
+        register_image_reader("png", png_reader_for_bytes);
+        #endif
+        registered = true;
+    }
+}
+
 int mapnik_map_render_to_file(mapnik_map_t * m, const char* filepath) {
+    ensure_readers_registered();
     mapnik_map_reset_last_error(m);
     if (m && m->m) {
         try {
@@ -356,6 +376,7 @@ void mapnik_image_free(mapnik_image_t * i) {
 }
 
 mapnik_image_t * mapnik_map_render_to_image(mapnik_map_t * m) {
+    ensure_readers_registered();
     mapnik_map_reset_last_error(m);
     mapnik_image_type * im = NULL;
     if (m && m->m) {
@@ -401,6 +422,7 @@ mapnik_layer_t * mapnik_map_get_layer(mapnik_map_t *m, size_t i) {
 }
 
 mapnik_grid_t * mapnik_map_render_to_grid(mapnik_map_t * m, mapnik_layer_t * l, const char * key) {
+    ensure_readers_registered();
     mapnik_map_reset_last_error(m);
     mapnik::grid * grid = NULL;
     if (m && m->m && l && l->l) {
